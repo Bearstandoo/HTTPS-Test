@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Run Folder's index.html</title>
+  <style>
+    iframe {
+      width: 100%;
+      height: 90vh;
+      border: none;
+    }
+    #import-button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <button id="import-button">Import Folder</button>
+  <iframe id="iframe" srcdoc="<p>Import a folder to run its index.html here.</p>"></iframe>
+
+  <script>
+    const importButton = document.getElementById('import-button');
+    const iframe = document.getElementById('iframe');
+
+    importButton.addEventListener('click', async () => {
+      try {
+        // Request access to a directory
+        const directoryHandle = await window.showDirectoryPicker();
+
+        // Look for index.html in the directory
+        const indexFileHandle = await directoryHandle.getFileHandle('index.html').catch(() => null);
+        if (!indexFileHandle) {
+          alert('No index.html found in the selected folder.');
+          return;
+        }
+
+        // Read the content of index.html
+        const indexFile = await indexFileHandle.getFile();
+        const indexContent = await indexFile.text();
+
+        // Create a Blob URL for the other folder files
+        const filesMap = {};
+        for await (const [name, handle] of directoryHandle.entries()) {
+          if (handle.kind === 'file') {
+            const file = await handle.getFile();
+            filesMap[name] = URL.createObjectURL(file);
+          }
+        }
+
+        // Replace relative paths in index.html to point to the Blob URLs
+        const adjustedIndexContent = indexContent.replace(
+          /(src|href)="([^"]+)"/g,
+          (match, attribute, path) =>
+            filesMap[path] ? `${attribute}="${filesMap[path]}"` : match
+        );
+
+        // Load the adjusted index.html content in the iframe
+        iframe.srcdoc = adjustedIndexContent;
+      } catch (error) {
+        console.error('Error accessing folder:', error);
+      }
+    });
+  </script>
+</body>
+</html>
